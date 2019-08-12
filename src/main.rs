@@ -248,9 +248,9 @@ fn _matcher(slice: &str, start: usize, end: usize) -> Result<u8, Error> {
     }
 }
 
-fn make_combinations(time: Time) -> (Vec<u8>, f32) {
+fn make_combinations(time: &Time) -> (Vec<u8>, f32) {
     let mut min_time = time.base_time();
-    let mut number_combo = time.digits;
+    let mut number_combo = time.digits.clone();
 
     for i in time.bounds.lower..time.bounds.upper {
         let digits = digits_to_compose(i);
@@ -309,6 +309,7 @@ fn main() {
     let matches = App::from_yaml(yaml).get_matches();
 
     if let Some(timer_value) = matches.value_of("INPUT") {
+        
         let time = match Time::new_str(timer_value) {
             Ok(timer) => timer,
             Err(err) => {
@@ -317,7 +318,9 @@ fn main() {
             }
         };
 
-        let (key_combo, time_to_execute) = make_combinations(time);
+        let (key_combo, time_to_execute) = make_combinations(&time);
+
+        if matches.value_of("statss").is_some() {println!{"aasdiabnsdabussdibasd"}}
 
         // verbose output
         if matches.value_of("verbose").is_some(){
@@ -329,14 +332,27 @@ fn main() {
                     print! {"-"}
                 }
             }
-            println! {" with an estimated runtime of {} seconds", time_to_execute}
+            print! {" with an estimated runtime of {} seconds", time_to_execute}
+
         }
         // non verbose output
         else{
-            let key_combo = key_combo.into_iter().map(|x| x.to_string()).collect::<String>();
+            let key_combo = key_combo.iter().map(|x| x.to_string()).collect::<String>();
 
-            println!{"combo: {} runtime est: {}", key_combo, time_to_execute}
+            print!{"combo: {} runtime est: {}", key_combo, time_to_execute}
         }
+
+        // optional statistics
+        if matches.value_of("stats").is_none() {
+            let total_time = ((time.min as u16), (time.sec as u16) ).total_seconds();
+            let microwave_time = key_combo.total_seconds();
+
+            let percent = 100.*(total_time as f32 - microwave_time as f32) / (total_time as f32);
+
+            print!{" percent error: {}", percent.abs()}
+        }
+
+        dbg!{matches};
 
 
 

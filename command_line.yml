@@ -4,6 +4,10 @@ version: "1.0"
 author: Brooks
 about: Optimizes the numbers for a microwave timer based on travel time to input characters
 args:
+    - stats:
+        short: s
+        long: stats
+        help: percentage errors for the estimation
     - INPUT:
         help: Sets the input timer to optimize
         required: true
