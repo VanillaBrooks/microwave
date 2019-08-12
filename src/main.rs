@@ -47,7 +47,7 @@ impl TotalSeconds for Vec<u8> {
                 .map(|x| x.to_string())
                 .collect::<String>()
                 .parse()
-                .unwrap()
+                .expect("err parsing already good string")
         };
 
         let (min, sec) = if self.len() > 2 {
@@ -83,19 +83,16 @@ fn combination_time(data: &Vec<u8>) -> f32 {
         let mut previous = data[0];
         let mut current = data[1];
 
-        // if the first character is zero (for minutes) we dont need to respect it
-        if previous != 0{
-            running_time += time_to_move(previous, current);
-        }
+        running_time += KEY_PRESS_TIME * data.len() as f32;
+
+        running_time += time_to_move(previous, current);
 
         for i in 2..data.len() {
-
-            let previous = current;
-            let current = data[i];
+            previous = current;
+            current = data[i];
             running_time += time_to_move(previous, current);
-        
+            running_time += KEY_PRESS_TIME;
         }
-
 
         running_time
     }
@@ -113,7 +110,8 @@ const PERCENT_ALLOWANCE: f32 = 0.05;
 const BASE_ALLOWANCE: u16 = 3;
 
 // Time to move one number up / down
-const ONE_UNIT_MOVE_TIME: f32 = 0.2;
+const ONE_UNIT_MOVE_TIME: f32 = 0.3;
+const KEY_PRESS_TIME: f32 = 0.1;
 
 #[derive(Copy, Clone)]
 struct Location {
@@ -150,7 +148,7 @@ struct Time {
     min: u8,
     sec: u8,
     bounds: Bounds,
-    digits: Vec<u8>
+    digits: Vec<u8>,
 }
 impl Time {
     fn new_str(arg: &str) -> Result<Self, Error> {
@@ -167,10 +165,13 @@ impl Time {
         }
 
         let (minutes, seconds_sep) = arg.split_at(split_index);
-        let seconds = seconds_sep.get(1..).expect("was not UTF8 text");
+        let seconds = match seconds_sep.get(1..) {
+            Some(good_string) => good_string,
+            None => return Err(Error::BadSlice),
+        };
 
-        let min = minutes.parse().expect("ouabsd");
-        let sec = seconds.parse().expect("aosbd");
+        let min = minutes.parse()?;
+        let sec = seconds.parse()?;
 
         let total_secs = (min as u16, sec as u16).total_seconds();
         let digits = digits_to_compose(total_secs);
@@ -179,13 +180,13 @@ impl Time {
             min: min,
             sec: sec,
             bounds: Bounds::from_total_secs(total_secs),
-            digits: digits
+            digits: digits,
         };
 
         Ok(x)
     }
 
-    fn base_time(&self) -> f32{
+    fn base_time(&self) -> f32 {
         combination_time(&self.digits)
     }
 }
@@ -196,11 +197,6 @@ struct Bounds {
     lower: u16,
 }
 impl Bounds {
-    fn new(minutes: u8, seconds: u8) -> Self {
-        let total_secs = (minutes as u16, seconds as u16).total_seconds();
-
-        Self::from_total_secs(total_secs)
-    }
     fn from_total_secs(total_secs: u16) -> Self {
         let diff = ((total_secs as f32) * PERCENT_ALLOWANCE).ceil() as u16;
         let total_diff = BASE_ALLOWANCE + diff;
@@ -212,7 +208,6 @@ impl Bounds {
             upper: upper,
             lower: lower,
         }
-
     }
 }
 
@@ -222,6 +217,24 @@ enum Error {
     NotNumber,      // the sides of the string separated by ":" "." dont have a number
     BadSlice,       // not utf8 string we can slice (also NotNumber)
     InvalidSeconds, // length of the number of seconds passed in was greater than 2
+}
+impl Error {
+    fn print_err(&self) {
+        match self {
+            Error::MissingChar => eprintln! {"Missing a `:` or `.` character for a timestamp"},
+            Error::NotNumber => {
+                eprintln! {"Non-Numeric character (or : / .) included in timestamp"}
+            }
+            Error::BadSlice => eprintln! {"Non UTF8 characters included in timer"},
+            Error::InvalidSeconds => eprintln! {"Must be a maximum of two characters of seconds"},
+        }
+    }
+}
+
+impl From<std::num::ParseIntError> for Error {
+    fn from(_: std::num::ParseIntError) -> Self {
+        Error::NotNumber
+    }
 }
 
 /// Helper function for slicing strings to check thier contents for numbers
@@ -240,60 +253,92 @@ fn make_combinations(time: Time) -> (Vec<u8>, f32) {
     let mut number_combo = time.digits;
 
     for i in time.bounds.lower..time.bounds.upper {
-        dbg!{i};
-
         let digits = digits_to_compose(i);
 
-        dbg!{&digits};
-
         let combo_time = combination_time(&digits);
-        dbg!{combo_time};
 
         if combo_time < min_time {
             min_time = combo_time;
             number_combo = digits;
         }
-
     }
 
     (number_combo, min_time)
 }
 
 fn digits_to_compose(total_seconds: u16) -> Vec<u8> {
-
-    let chars_to_vec = |x: String| x.chars().map(|x| x.to_string().parse().unwrap()).collect::<Vec<_>>();
+    let chars_to_vec = |x: String| {
+        x.chars()
+            .map(|x| x.to_string().parse().expect("this err should not happen"))
+            .collect::<Vec<_>>()
+    };
 
     // if less than 90 seconds you can input 90 seconds and the microwave understands that
     // it is 1minute ... seconds
-    if total_seconds < 90{
-        return chars_to_vec(total_seconds.to_string())
+    if total_seconds < 90 {
+        return chars_to_vec(total_seconds.to_string());
     }
-    
+
     let minutes = total_seconds / 60;
     let seconds = total_seconds - (60 * minutes);
- 
-    let min = minutes.to_string();
+
+    // make min an empty string if its zero instead of `0`
+    let min = if minutes == 0 {
+        "".to_string()
+    } else {
+        minutes.to_string()
+    };
     // add a zero for single digit seconds
     // 1 min + 5 seconds -> 1:05
-    let sec = 
-        if seconds > 9 {
-            seconds.to_string()
-        }
-        else{
-            "0".to_owned() + &seconds.to_string()
-        };
+    let sec = if seconds > 9 {
+        seconds.to_string()
+    } else {
+        "0".to_owned() + &seconds.to_string()
+    };
 
     let mut min = chars_to_vec(min);
     let mut sec = chars_to_vec(sec);
-    
+
     min.append(&mut sec);
     min
 }
 
+use clap::{load_yaml, App};
 fn main() {
-    let mut time = Time::new_str("5:30").unwrap();
+    let yaml = load_yaml! {r"..\command_line.yml"};
+    let matches = App::from_yaml(yaml).get_matches();
 
-    let combo = make_combinations(time);
-    dbg!{"result: \n\n\n"};
-    dbg!{combo};
+    if let Some(timer_value) = matches.value_of("INPUT") {
+        let time = match Time::new_str(timer_value) {
+            Ok(timer) => timer,
+            Err(err) => {
+                err.print_err();
+                panic! {""}
+            }
+        };
+
+        let (key_combo, time_to_execute) = make_combinations(time);
+
+        // verbose output
+        if matches.value_of("verbose").is_some(){
+
+            print! {"most effective combination is "}
+            for i in 0..key_combo.len() {
+                print! {"{}", key_combo[i]}
+                if i != key_combo.len() - 1 {
+                    print! {"-"}
+                }
+            }
+            println! {" with an estimated runtime of {} seconds", time_to_execute}
+        }
+        // non verbose output
+        else{
+            let key_combo = key_combo.into_iter().map(|x| x.to_string()).collect::<String>();
+
+            println!{"combo: {} runtime est: {}", key_combo, time_to_execute}
+        }
+
+
+
+    }
 }

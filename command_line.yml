@@ -1,0 +1,14 @@
+# CLI CONFIGURAITON
+name: microwave
+version: "1.0"
+author: Brooks
+about: Optimizes the numbers for a microwave timer based on travel time to input characters
+args:
+    - INPUT:
+        help: Sets the input timer to optimize
+        required: true
+        index: 1
+    - verbose:
+        short: v
+        long: verbose
+        help: controls how verbose the output is
