@@ -195,6 +195,7 @@ impl Time {
 struct Bounds {
     upper: u16,
     lower: u16,
+    total_sec: u16,
 }
 impl Bounds {
     fn from_total_secs(total_secs: u16) -> Self {
@@ -207,6 +208,7 @@ impl Bounds {
         Self {
             upper: upper,
             lower: lower,
+            total_sec: total_secs,
         }
     }
 }
@@ -252,18 +254,35 @@ fn make_combinations(time: &Time) -> (Vec<u8>, f32) {
     let mut min_time = time.base_time();
     let mut number_combo = time.digits.clone();
 
+    // previous difference between the original total seconds & new total seconds
+    let mut previous_difference = 0;
+
     for i in time.bounds.lower..time.bounds.upper {
         let digits = digits_to_compose(i);
 
         let combo_time = combination_time(&digits);
 
-        if combo_time < min_time {
+        if combo_time <= min_time
+            && allow_update(time.bounds.total_sec, i, &mut previous_difference)
+        {
             min_time = combo_time;
             number_combo = digits;
         }
     }
 
     (number_combo, min_time)
+}
+
+fn allow_update(base_time: u16, candidate_time: u16, previous_difference: &mut u16) -> bool {
+    let new_diff = ((base_time as i16) - (candidate_time as i16)).abs() as u16;
+
+    if new_diff < *previous_difference || *previous_difference == 0 {
+        *previous_difference = new_diff;
+
+        true
+    } else {
+        false
+    }
 }
 
 fn digits_to_compose(total_seconds: u16) -> Vec<u8> {
@@ -309,7 +328,6 @@ fn main() {
     let matches = App::from_yaml(yaml).get_matches();
 
     if let Some(timer_value) = matches.value_of("INPUT") {
-        
         let time = match Time::new_str(timer_value) {
             Ok(timer) => timer,
             Err(err) => {
@@ -320,11 +338,8 @@ fn main() {
 
         let (key_combo, time_to_execute) = make_combinations(&time);
 
-        if matches.value_of("statss").is_some() {println!{"aasdiabnsdabussdibasd"}}
-
         // verbose output
-        if matches.value_of("verbose").is_some(){
-
+        if matches.is_present("verbose") {
             print! {"most effective combination is "}
             for i in 0..key_combo.len() {
                 print! {"{}", key_combo[i]}
@@ -333,28 +348,24 @@ fn main() {
                 }
             }
             print! {" with an estimated runtime of {} seconds", time_to_execute}
-
         }
         // non verbose output
-        else{
+        else {
             let key_combo = key_combo.iter().map(|x| x.to_string()).collect::<String>();
 
-            print!{"combo: {} runtime est: {}", key_combo, time_to_execute}
+            print! {"combo: {} runtime est: {}", key_combo, time_to_execute}
         }
 
         // optional statistics
-        if matches.value_of("stats").is_none() {
-            let total_time = ((time.min as u16), (time.sec as u16) ).total_seconds();
+        if matches.is_present("stats") {
+            let total_time = ((time.min as u16), (time.sec as u16)).total_seconds();
             let microwave_time = key_combo.total_seconds();
 
-            let percent = 100.*(total_time as f32 - microwave_time as f32) / (total_time as f32);
+            let percent = 100. * (total_time as f32 - microwave_time as f32) / (total_time as f32);
 
-            print!{" percent error: {}", percent.abs()}
+            print! {"\noriginal combination_time: {}", time.base_time()}
+            print! {"\ntime saved: {}", time.base_time() - time_to_execute}
+            print! {"\npercent error: {} ", percent.abs()}
         }
-
-        dbg!{matches};
-
-
-
     }
 }
