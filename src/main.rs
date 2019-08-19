@@ -8,6 +8,10 @@
 // ^
 // | (0,0)
 
+/*
+    Statics
+*/
+
 use lazy_static::lazy_static;
 lazy_static! {
 
@@ -26,6 +30,14 @@ lazy_static! {
     ];
 
 }
+
+// 5 seconds + 2 % total seconds
+const PERCENT_ALLOWANCE: f32 = 0.2;
+const BASE_ALLOWANCE: u16 = 5;
+
+// Time to move one number up / down
+const ONE_UNIT_MOVE_TIME: f32 = 0.3;
+const KEY_PRESS_TIME: f32 = 0.1;
 
 trait TotalSeconds {
     fn total_seconds(&self) -> u16;
@@ -105,13 +117,6 @@ fn time_to_move(num_1: u8, num_2: u8) -> f32 {
     a.distance(b) * ONE_UNIT_MOVE_TIME
 }
 
-// 3 seconds + 5 % total seconds
-const PERCENT_ALLOWANCE: f32 = 0.05;
-const BASE_ALLOWANCE: u16 = 3;
-
-// Time to move one number up / down
-const ONE_UNIT_MOVE_TIME: f32 = 0.3;
-const KEY_PRESS_TIME: f32 = 0.1;
 
 #[derive(Copy, Clone)]
 struct Location {
