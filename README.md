@@ -17,6 +17,7 @@ An input `x`  is a candidate if it is within `x +/- (3 + 0.05*x)`. This means pl
 
 Percentage differences between total cooktime of the input value and approximation output value can be found with `--stats` : 
 
+
 `microwave 0:20 -s`
 
 > combo: 22 runtime est: 0.2 percent error: 10
